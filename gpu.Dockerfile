@@ -1,10 +1,11 @@
 # local 빌드시
-FROM tensorflow/tensorflow:2.9.1-gpu-jupyter
-FROM nvidia/cuda:11.2.1-cudnn8-devel-ubuntu18.04 AS nvidia
+FROM tensorflow/tensorflow:2.6.0-gpu-jupyter
+FROM nvidia/cuda:11.3.1-cudnn8-devel-ubuntu18.04 AS nvidia
 
 # CUDA
 ENV CUDA_MAJOR_VERSION=11
-ENV CUDA_MINOR_VERSION=2
+ENV CUDA_MINOR_VERSION=3
+
 ENV CUDA_VERSION=$CUDA_MAJOR_VERSION.$CUDA_MINOR_VERSION
 
 ENV PATH=/usr/local/nvidia/bin:/usr/local/cuda/bin:/opt/bin:${PATH}
@@ -54,7 +55,7 @@ ENV PATH $CONDA_DIR/bin:$PATH
 
 # Install miniconda
 RUN echo "export PATH=$CONDA_DIR/bin:"'$PATH' > /etc/profile.d/conda.sh && \
-    curl -sL https://repo.anaconda.com/miniconda/Miniconda3-py37_4.12.0-Linux-x86_64.sh -o ~/miniconda.sh && \
+    curl -sL https://repo.anaconda.com/miniconda/Miniconda3-py37_4.10.3-Linux-x86_64.sh -o ~/miniconda.sh && \
     /bin/bash ~/miniconda.sh -b -p $CONDA_DIR && \
     rm ~/miniconda.sh
 
@@ -72,7 +73,7 @@ RUN pip install setuptools && \
     pip install pymysql && \
     pip install numpy && \
     pip install scipy && \
-    pip install pandas==1.3.5 && \
+    pip install pandas==1.2.5 && \
     pip install jupyter notebook && \
     pip install matplotlib && \
     pip install seaborn && \
@@ -87,16 +88,23 @@ RUN pip install setuptools && \
     pip install nbconvert && \
     pip install Pillow && \
     pip install tqdm && \
-    pip install tensorflow==2.9.1 && \
+    pip install tensorflow==2.6.0 && \
     pip install tensorflow-datasets && \
     pip install gensim && \
     pip install nltk && \
     pip install wordcloud && \
     apt-get install -y graphviz && pip install graphviz && \
-    pip install cupy-cuda112
+    pip install cupy-cuda112 && \
+    pip install kiwipiepy && \
+    pip install emoji && \
+    pip install sentence_transformers && \
+    pip install soynlp && \
+    pip install stopwords
+
 
 # Pytorch 설치
-RUN pip install torch==1.10.1+cu111 torchvision==0.11.2+cu111 torchaudio==0.10.1 -f https://download.pytorch.org/whl/torch_stable.html
+RUN pip install torch==1.11.0+cu113 torchvision==0.12.0+cu113 torchaudio==0.11.0 --extra-index-url https://download.pytorch.org/whl/cu113
+
 
 RUN pip install --upgrade cython && \
     pip install --upgrade cysignals && \
@@ -105,14 +113,13 @@ RUN pip install --upgrade cython && \
     pip install transformers
 
 RUN pip install pystan==2.19.1.1 && \
-    pip install prophet && \
-    pip install torchsummary
+    pip install fbprophet
 
 RUN pip install "sentencepiece<0.1.90" wandb tensorboard albumentations pydicom opencv-python scikit-image pyarrow kornia \
     catalyst captum
 
-RUN pip install fastai 
-# RUN conda install -c rapidsai -c nvidia -c numba -c conda-forge cudf=22.06 python=3.7 cudatoolkit=11.2
+RUN pip install fastai && \
+    conda install -c rapidsai -c nvidia -c numba -c conda-forge cudf=21.08 python=3.7 cudatoolkit=11.2
 
 # cmake 설치 (3.16)
 RUN wget https://cmake.org/files/v3.16/cmake-3.16.2.tar.gz && \
@@ -127,12 +134,28 @@ ENV PATH=/usr/local/bin:${PATH}
 # 나눔고딕 폰트 설치
 # matplotlib에 Nanum 폰트 추가
 RUN apt-get install fonts-nanum* && \
-    cp /usr/share/fonts/truetype/nanum/Nanum* /opt/conda/envs/py37/lib/python3.7/site-packages/matplotlib/mpl-data/fonts/ttf/ && \
-    fc-cache -fv && \
-    rm -rf ~/.cache/matplotlib/*
+   cp /usr/share/fonts/truetype/nanum/Nanum* /opt/conda/envs/py37/lib/python3.7/site-packages/matplotlib/mpl-data/fonts/ttf/ && \
+   fc-cache -fv && \
+   rm -rf ~/.cache/matplotlib/*
 
-# konlpy, py-hanspell, soynlp 패키지 설치 
+# 나눔고딕 폰트 설치, D2Coding 폰트 설치
+# matplotlib에 Nanum 폰트 추가
+# RUN apt-get install fonts-nanum* && \
+#     mkdir ~/.local/share/fonts && \
+#     cd ~/.local/share/fonts && \
+#     wget https://github.com/naver/d2codingfont/releases/download/VER1.3.2/D2Coding-Ver1.3.2-20180524.zip && \
+#     unzip D2Coding-Ver1.3.2-20180524.zip && \
+#     mkdir /usr/share/fonts/truetype/D2Coding && \
+#     cp ./D2Coding/*.ttf /usr/share/fonts/truetype/D2Coding/ && \
+#     cp /usr/share/fonts/truetype/nanum/Nanum* /opt/conda/lib/python3.7/site-packages/matplotlib/mpl-data/fonts/ttf/ && \
+#     fc-cache -fv && \
+#     rm -rf D2Coding* && \
+#     rm -rf ~/.cache/matplotlib/*
+
+
+# konlpy, py-hanspell, soynlp 패키지 설치
 RUN pip install konlpy
+   
 
 # 형태소 분석기 mecab 설치
 RUN cd /tmp && \
@@ -204,19 +227,15 @@ RUN apt-get autoremove -y && apt-get clean && \
 ENV LANG ko_KR.UTF-8
 
 # Jupyter Notebook config 파일 생성
-# RUN jupyter notebook --generate-config
+RUN jupyter notebook --generate-config
 
 # config 파일 복사 (jupyter_notebook_config.py 파일 참고)
-# COPY jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
+COPY jupyter_notebook_config.py /root/.jupyter/jupyter_notebook_config.py
 
 # 설치 완료 후 테스트용 ipynb
-# COPY test.ipynb /home/jupyter/test.ipynb
+COPY test.ipynb /home/jupyter/test.ipynb
 
 # 기본
 EXPOSE 8888
 # jupyter notebook 의 password를 지정하지 않으면 보안상 취약하므로 지정하는 것을 권장
-# CMD jupyter notebook --allow-root
-
-
-
-
+CMD jupyter notebook --allow-root
